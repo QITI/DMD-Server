@@ -26,7 +26,7 @@ This document provides the complete optical and mathematical background for ever
      FOURIER PLANE (FP)              LENS (f)               IMAGE PLANE (IP)
      ┌──────────────────┐         │         │         ┌──────────────────┐
      │                  │         │         │         │                  │
-     │  E_FP(ξ, η)     │         │    f    │    f    │  E_IP(x, y)      │
+     │  E_FP(ξ, η)      │         │    f    │    f    │  E_IP(x, y)      │
      │  (grating)       │ ◄──────►│─────────│◄───────►│  (focused beam)  │
      │                  │         │         │         │                  │
      │  spatial freq    │         │ Fourier │         │  spatial position│
@@ -128,16 +128,16 @@ Well within the paraxial regime. The approximation is excellent.
      ━━━━━━━━━━━━━━━━━━━━━━                    ━━━━━━━━━━━━━━━━━━━━━━━━
      
      ◄────────── 2560 pixels ──────────►                    incident
-     ┌──────────────────────────────────┐                   light
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ ▲                    \
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ │                     \  +12°
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ │             ─────────\────── ON
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ 1600              flat  │
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ pixels      ─────────/────── OFF
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ │                   /  -12°
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ │                  /
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ ▼              reflected
-     └──────────────────────────────────┘              (to beam dump)
+     ┌───────────────────────────────────┐                   light
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ ▲                    \
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ │                     \  +12°
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ │             ─────────\────── ON
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ 1600              flat  │
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ pixels      ─────────/────── OFF
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ │                   /  -12°
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ │                  /
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │ ▼              reflected
+     └───────────────────────────────────┘              (to beam dump)
      
      Each ░ = one 7.56 μm mirror
      Tilt axis = along diagonal (hence 45° mount)
@@ -1087,10 +1087,10 @@ This motivates the combined approach: IFTA for the signal window, secondary grat
      
      Stitched result:
      ┌────────────────────────────────────────────────────────────┐
-     │  10⁰ ─ from 120 μs exposure (peak not saturated)          │
-     │  10⁻² ─ from 12 ms exposure (good S/N in shoulder)        │
-     │  10⁻⁴ ─ from 1.2 s exposure (tail visible above noise)    │
-     │  10⁻⁶ ─ from 12 s exposure (noise floor measurement)      │
+     │  10⁰ ─ from 120 μs exposure (peak not saturated)           │
+     │  10⁻² ─ from 12 ms exposure (good S/N in shoulder)         │
+     │  10⁻⁴ ─ from 1.2 s exposure (tail visible above noise)     │
+     │  10⁻⁶ ─ from 12 s exposure (noise floor measurement)       │
      └────────────────────────────────────────────────────────────┘
      
      → Complete intensity profile spanning 6 orders of magnitude
