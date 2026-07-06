@@ -543,8 +543,8 @@ class MCMRExperiment(Bloodstone_Experiment):
 └─────────────────┘              └────────┬─────────┘
                                           │ USB 3.0
                                  ┌────────▼─────────┐
-                                 │  GPU PC (Windows) │
-                                 │  dmd_server.py    │
+                                 │  GPU PC (Windows)│
+                                 │  dmd_server.py   │
                                  └──────────────────┘
 ```
 
