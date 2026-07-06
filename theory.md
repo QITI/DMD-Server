@@ -2,6 +2,24 @@
 
 This document provides the complete optical and mathematical background for every capability implemented in the DMD server. It is intended as a self-contained reference for anyone working on or extending the system.
 
+> **Primary reference.** The double-pass and Fourier-plane-multiplexing results described
+> here are published in: S. Mahato and R. Islam, *"Achieving $10^{-5}$ level relative
+> intensity crosstalk in optical holographic qubit addressing via a double-pass digital
+> micromirror device,"* arXiv:2512.13882v1 (2025). Numerical values (crosstalk levels,
+> effective aperture, window sizes, optimized parameters) in this document are taken from
+> that paper. The paper characterizes the optical system up to the second image plane
+> (IP2); relaying to actual ions is future work.
+
+### Headline results (from the paper)
+
+- Baseline crosstalk from the IFTA primary beam alone: $I_X \approx -42.6$ dB ($\approx 10^{-4.3}$).
+- A single secondary hologram reduces $I_X$ to $\approx -48$ dB (about **5 dB** improvement;
+  up to **10 dB** suppression is possible under ideal amplitude matching).
+- **Multiplexing** several secondary holograms holds $I_X \lesssim -50$ dB ($10^{-5}$) at all
+  targeted sites ($\pm4w$, $\pm8w$, $\pm12w$) across the full field of view.
+- **Double-pass image-plane filtering** drives $I_X$ below $-50$ dB beyond $\sim14w'$ and
+  toward $-60$ dB ($10^{-6}$) beyond $\sim30w'$, approaching the detector noise floor.
+
 ---
 
 ## Table of Contents
@@ -204,16 +222,20 @@ For our geometry (θ_tilt = 12°, grating directing light at angle θ_d), the in
      ┌────────────────────────┐         ┌──────────────────────────┐
      │ █░█░█░█░█░█░█░█░█░█░█░ │         │                          │
      │ ░█░█░█░█░█░█░█░█░█░█░█ │         │    m=-1        m=0       │
-     │ █░█░█░█░█░█░█░█░█░█░█░ │  ──►    │  (2×aberr)  (residual)   │
+     │ █░█░█░█░█░█░█░█░█░█░█░ │  ──►    │ (aberr-free!) (residual) │
      │ ░█░█░█░█░█░█░█░█░█░█░█ │  lens   │     ●          ●         │
-     │ █░█░█░█░█░█░█░█░█░█░█░ │         │                     ●    │
+     │ █░█░█░█░█░█░█░█░█░█░█░ │         │  ← USED              ●   │
      │ ░█░█░█░█░█░█░█░█░█░█░█ │         │                   m=+1   │
-     │ █░█░█░█░█░█░█░█░█░█░█░ │         │             (aberr-free!)│
-     └────────────────────────┘         │                 ← USED   │
-                                        └──────────────────────────┘
+     │ █░█░█░█░█░█░█░█░█░█░█░ │         │                (2×aberr) │
+     └────────────────────────┘         └──────────────────────────┘
+     
      period = 4 pixels
      (ON/OFF alternating                  Three orders separated by
       with phase modulation)              x₁ = λf/p = 3.05 mm
+     
+     NOTE: Bloodstone uses negative_order=True, so the grating phase
+     sign is flipped: cos(x₀·k − Φ_out + Φ_in). This makes m=−1
+     the aberration-free order. Blazing also favors this order.
 ```
 
 ### 3.1 The Grayscale Grating Function
@@ -260,6 +282,8 @@ g(x) = F⁻¹{E_in(k) · G(k)}
 **Critical observation:** The first-order term is simply f(x + x₀) — the target field, shifted to position x₀, with NO aberration phase. The aberration cancels because Φ_in appears with opposite signs in the grating argument and the field phase.
 
 The negative first order carries **twice** the aberration. The zeroth order carries residual aberration. Both are spatially separated from the first order and are blocked by a spatial filter.
+
+> **Convention note:** This derivation uses the *default* convention (`negative_order=False`), where the **positive** first order (m=+1) is aberration-free. Bloodstone uses `negative_order=True`, which flips the phase sign (see Section 3.4) so that the **negative** first order (m=−1) is aberration-free instead. This is why the diagram at the top of this section labels m=−1 as the used order. The physics is identical — only which order carries the clean beam changes.
 
 ### 3.3 Periodicity and Beam Position
 
@@ -593,9 +617,9 @@ This is much finer than a Shack-Hartmann wavefront sensor (micro-lens diameter >
             │   ╱    ╲                              │   ╱    ╲
       -20 dB┤  ╱      ╲                       -20 dB┤  ╱      ╲
             │ ╱        ╲                            │ ╱        ╲
-      -40 dB┤╱──────────╲─── ← IX=10⁻⁴        -40 dB┤╱          ╲
+    -42.6dB ┤╱──────────╲─ ← IX baseline      -42.6 ┤╱          ╲
             │            ↑                          │       ╭╮   ╲── suppressed!
-      -60 dB┤     neighbor here               -50 dB┤       ╰╯    ← IX=10⁻⁴·⁹
+      -50 dB┤     neighbor here               -50 dB┤       ╰╯    ← IX ≲ 10⁻⁵ (−50 dB)
             ├──┬────┬────┬──                        ├──┬────┬────┬──
               x₀  x₀+4w                              x₀  x₀+4w
      
@@ -610,24 +634,24 @@ This is much finer than a Shack-Hartmann wavefront sensor (micro-lens diameter >
      │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
      │ ░░░░░░░░░░░░░░░░░░░░░░██████████████████░░░░░░░░░░░░░░░░░░░░░░░░░ │ ← secondary
      │ ░░░░░░░░░░░░░░░░░░░░░░██████████████████░░░░░░░░░░░░░░░░░░░░░░░░░ │   grating
-     │ ░░░░░░░░░░░░░░░░░░░░░░██████████████████░░░░░░░░░░░░░░░░░░░░░░░░░ │   (3×400 px)
-     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+     │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │   (m=2 × l=460 px)
      └──────────────────────────────────────────────────────────────────────┘
      
      
-     INTERFERENCE AT NEIGHBOR:
-     ━━━━━━━━━━━━━━━━━━━━━━━━━
+     INTERFERENCE AT NEIGHBOR (paper notation: A_s, Φ_s):
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      
-     E_total(4w) = Ã₁·e^(iφ₁)  +  Ã₂·e^(iφ₂)
+     E_total(4w) = Ã₁·e^(iΦ₁)  +  Ã₂·e^(iΦ_s)
                    ──────────      ──────────
                    primary tail    secondary beam
      
-     I = Ã₁² + Ã₂² + 2Ã₁Ã₂·cos(φ₁ − φ₂)
+     I = Ã₁² + Ã₂² + 2Ã₁Ã₂·cos(Φ₁ − Φ_s)
      
-     Optimize:
-       ① Scan φ₂: 0 → 4π  → find destructive condition (φ₁−φ₂ = π)
-       ② Scan Ã₂ at optimal φ₂ → match amplitudes (Ã₂ ≈ Ã₁)
-       → I_min = (Ã₁ − Ã₂)² → 0
+     Optimize (measured optima from the paper):
+       ① Scan Φ_s: 0 → 4π  → Φ_s = 2.77π  (from cosine fit, Fig. 2c)
+       ② Scan A_s at optimal Φ_s → A_s = 0.38  (from quadratic fit, Fig. 2d)
+       → baseline −42.6 dB → −48 dB (single hologram, ~5 dB gain)
+       → multiplexed → I_X ≲ −50 dB (10⁻⁵)
 ```
 
 ### 6.1 The Problem: Residual Crosstalk at the Nearest Neighbor
@@ -656,17 +680,29 @@ E_total(x₀ + a) = E_primary(x₀ + a) + E_secondary(x₀ + a) = 0
 
 ### 6.3 The Secondary Grating Function
 
-A rectangular window of dimensions l × m (pixels) on the FP carries a secondary grating:
+A rectangular window of dimensions l × m (pixels) on the Fourier plane carries a secondary
+grating. This is Eq. (1) of the paper (notation aligned):
 
 ```
-F_s(k) = (η / E_in(k)) × A'₂ × rect(k/l) × ½ × [cos(2π k_a·k/(λf) + Φ_in − φ₂) + 1]
+F_s(x) = η · |rect(x/l, y/m) / E_in(x)| · (A_s/2) · [cos(2π x_a·x/(λf) + Φ_s − Φ_in(x)) + 1]
 ```
 
 where:
-- A'₂: controllable amplitude (0 to 1)
-- k_a: spatial frequency corresponding to position x₀ + a
-- φ₂: controllable phase
-- rect(k/l): confines the grating to a small window
+- A_s: controllable amplitude of the secondary hologram (0 ≤ A_s ≤ 1);
+       set physically by the ON-mirror density in the window
+- Φ_s: controllable phase, set by lateral displacement of the grating
+- x_a: spatial-frequency vector placing the auxiliary beam at X₀ + a in the image plane
+- Φ_in(x): input aberration phase map (in-situ characterized)
+- 1/|E_in(x)|: compensates spatial nonuniformity of the incident field across the DMD
+- rect(x/l, y/m): confines the grating to a rectangular window
+- η: normalization enforcing 0 ≤ F_s ≤ 1
+
+**Window size (paper):** for trapped-ion addressing along a linear chain, m = 2 DMD pixels
+(width, along the transverse axis) and l = 460 DMD pixels (length, along the ion axis). The
+narrow width in the Fourier plane produces a large transverse spread of the auxiliary beam
+at the image plane, which is acceptable as long as it does not illuminate nearby structures
+(e.g. trap electrodes). The secondary grating is generated with the **random binarization**
+method.
 
 ### 6.4 The Secondary Beam at the IP
 
@@ -695,33 +731,72 @@ I(x₀ + a) = |Ã₁ e^(iφ₁) + Ã₂ e^(iφ₂)|²
 → I_min = (Ã₁ − Ã₂)² = 0
 ```
 
-In practice, achieving exactly Ã₂ = Ã₁ is difficult, but significant suppression (6+ dB) is achievable.
+In practice, achieving exactly Ã₂ = Ã₁ is difficult. The paper reports a baseline of
+−42.6 dB from the primary beam alone, reduced to **−48 dB** by a single optimized secondary
+hologram (about **5 dB** average improvement), with **up to 10 dB** relative suppression
+possible.
 
 ### 6.6 Periodicity Calculation
 
-The secondary beam must appear at distance Δx from the first-order origin. The required grating periodicity (in physical units) is:
+The grating periodicity sets the **absolute position** of the secondary beam measured from the zeroth order. The secondary beam must land at the neighbor position, which is the primary beam position minus a small offset (4w at IP1). Let x_sec be that absolute position along the diffraction axis:
 
 ```
-p_secondary = cos(θ) × λ × f / (Δx × pixel_size)
+x_sec = x_first_order − 4w_IP1     (position of the secondary beam from zeroth order)
+
+p_secondary = cos(θ) × λ × f / (x_sec × pixel_size)
 ```
 
-For Δx = 4w = 4 × 9 μm = 36 μm (at IP1, where the beam waist is 9 μm before demagnification):
+The x-component of the first-order origin is (from Section 3.3):
 
 ```
-p_secondary = cos(π/4) × 369e-9 × 0.25 / (36e-6 × 7.56e-6)
-            = 0.707 × 9.225e-8 / 2.72e-10
-            ≈ 240 (pixels per period, non-integer → produces a smooth variation)
+x_first_order = cos(π/4) × λf / (4 × pixel_size) = 0.707 × 3.05 mm = 2.16 mm
 ```
 
-Note: the periodicity is large because the secondary beam needs to be close to the primary beam.
+The neighbor offset at IP1 is 4w_IP1 = 4 × 9 μm = 36 μm, so:
+
+```
+x_sec = 2.16 mm − 36 μm ≈ 2.124 mm
+
+p_secondary = cos(π/4) × 369e-9 × 0.25 / (2.124e-3 × 7.56e-6)
+            = 0.707 × 9.225e-8 / (1.606e-8)
+            ≈ 4.06 pixels per period
+```
+
+Note: the secondary grating periodicity (~4 pixels) is nearly identical to the primary grating (4 pixels) — this makes sense because the secondary beam sits right next to the primary beam. The tiny difference (4.06 vs 4.00) is what shifts the beam by exactly 4w to land on the neighbor. This is why the secondary grating must occupy a physically distinct window on the DMD: its period is too close to the primary's to separate them within the same region.
 
 ### 6.7 Optimization Procedure
 
-1. **Phase scan:** Fix A'₂ = 0.7 (arbitrary starting point). Scan φ₂ from 0 to 4π. Plot I(x₀+a) vs φ₂. The minimum gives φ₂,opt.
+1. **Measure baseline:** record I_X at the target location from the primary beam alone
+   (−42.6 dB in the paper).
+2. **Phase scan:** fix A_s = 0.70. Scan Φ_s from 0 to 4π. Fit the linear-scale data to a
+   cosine model to extract the optimum Φ_s = 2.77π (Fig. 2c).
+3. **Amplitude scan:** fix Φ_s = 2.77π. Scan A_s from 0 to 1; fit to a quadratic model
+   (excluding A_s ≥ 0.9, which deviates from the quadratic trend). The minimum yields the
+   optimum A_s = 0.38 (Fig. 2d).
 
-2. **Amplitude scan:** Fix φ₂ = φ₂,opt. Scan A'₂ from 0 to 1. Fine-tune for lowest I(x₀+a).
+The 4π range (instead of 2π) accounts for phase-wrapping ambiguity in the grating implementation.
 
-The 4π range (instead of 2π) accounts for potential phase wrapping ambiguities in the grating implementation.
+### 6.8 Multiplexing Multiple Secondary Holograms
+
+The Fourier plane can be **multiplexed** with several secondary holograms to suppress
+crosstalk at multiple sites simultaneously. The paper demonstrates six secondary holograms
+targeting ±4w, ±8w, and ±12w, achieving I_X ≲ −50 dB (10⁻⁵) at all six sites.
+
+Practical rules from the paper:
+- Estimate each required auxiliary amplitude from the measured primary-beam I_X at that site.
+- When two holograms need comparable amplitudes, overlay them on the same pixels (removes as
+  little of the primary IFTA hologram as possible).
+- **Do not overlay more than two** secondary holograms on the same DMD region — doing so
+  degrades independent amplitude/phase control.
+- For more than two, or very different amplitudes, stack their windows along the y direction
+  in the Fourier plane.
+- Scan each hologram's phase independently, then do a fine amplitude scan of each at its
+  optimum phase.
+
+**Scaling limit:** performance degrades noticeably beyond ~8 secondary holograms. Two causes:
+(1) diffraction sidelobes from the rectangular window (Eq. 1) cause the auxiliary beams to
+overlap — could be mitigated by smoothing the window; (2) each added hologram removes more
+Fourier components from the primary beam, degrading the main addressing spot.
 
 ---
 
@@ -742,69 +817,60 @@ The 4π range (instead of 2π) accounts for potential phase wrapping ambiguities
                │     │  tail→    │                       │     │pupil   │  │     │    │
                │     │     →     │                       │     │clips→  │  │     │    │
                └─────────────────┘                       └──────────────┘  └──────────┘
-               IX ~ 10⁻⁴ everywhere                      IP1 pupil (ON)    IX ~ 10⁻⁶
-                                                         blocks tails      beyond 14w
+               IX ~ 10⁻⁴ everywhere                    IP1 SQUARE pupil    IX < −50 dB >14w'
+                                                       (ON) blocks tails   → −60 dB >30w'
      
      
-     DMD PIXEL LAYOUT (2560 columns):
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     DMD PIXEL LAYOUT (per the paper — 2560 columns):
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      
-     Column:  0            1960  2060          2560
-              │              │    │              │
-              ▼              ▼    ▼              ▼
-     ┌────────────────────────┬──┬──────────────────┐
-     │                        │  │                  │
-     │   FOURIER PLANE (FP)   │BF│  IMAGE PLANE 1   │
-     │   IFTA hologram        │  │  (IP1 PUPIL)     │
-     │   (primary grating)    │UF│                  │
-     │                        │  │    ┌─────────┐   │
-     │   1960 × 1600 pixels   │FE│    │ ○○○○○○  │   │
-     │                        │  │    │ ○pupil○ │   │
-     │   Generates the beam   │R │    │ ○○○○○○  │   │
-     │                        │  │    └─────────┘   │
-     │                        │  │                  │
-     └────────────────────────┴──┴──────────────────┘
+     Column:  0                    2060           2560
+              │                     │              │
+              ▼                     ▼              ▼
+     ┌──────────────────────────────┬──────────────────┐
+     │                              │                  │
+     │   FP1  (Fourier plane)       │  IP1 (image      │
+     │   1600 × 2060 pixels         │  plane region)   │
+     │   IFTA hologram + secondary  │  1600 × 500 px   │
+     │   multiplexing               │    ┌────────┐    │
+     │                              │    │████████│    │ ← reflective
+     │   (hologram in 0–1960; ~100  │    │█ pupil █│    │   SQUARE pupil
+     │    px guard region to 2060)  │    │████████│    │   of size d
+     │                              │    └────────┘    │
+     └──────────────────────────────┴──────────────────┘
+     Pink dashed line at col 2060 = FP1/IP1 demarcation
      
-     BF = 100-pixel buffer (all OFF, optical separation)
-     
-     Light hits FP → diffracts → retro-reflector bends it back
-     → lands on IP1 region → only ON mirrors (pupil) reflect
-     → relay lens images to IP2 (ion plane)
+     Light hits FP1 → diffracts → retro-reflector bends it back
+     → lands on IP1 region → only ON mirrors (square pupil) reflect
+     → relay images IP1 onto IP2 with demagnification 0.6 (w' = 0.6 w)
      
      
-     OPTICAL PATH:
-     ━━━━━━━━━━━━━
+     OPTICAL PATH (Fig. 1b of the paper):
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      
-                ┌─────────────────────────────────────────┐
-                │                                         │
-     Input ──►  │  DMD (FP region)                        │
-     beam       │      │                                  │
-                │      ▼ first-order diffraction          │
-                │      │                                  │
-                │  Retro-reflector board                  │
-                │  (250mm lens + 2 mirrors)               │
-                │      │                                  │
-                │      ▼ beam returns to DMD              │
-                │                                         │
-                │  DMD (IP1 region) ← PUPIL HERE          │
-                │      │                                  │
-                └──────┼──────────────────────────────────┘
-                       │
-                       ▼ D-shaped mirror reflects
-                       │
-                    f₁=250mm lens → FP2 iris → f₂=150mm lens
-                       │
-                       ▼
-                    IP2 (camera or ion plane)
+     fiber(370nm) → L1 collimate (waist 10 mm) → AS1 iris (illuminate FP1 only)
+       → DMD FP1 → L2 (focal length f, on translation stage)
+       → DMD is simultaneously at FP and IP of L2
+       → DMD IP1 region [reflective pupil] → D-shaped mirror
+       → AS2 iris at FP2 (blocks unwanted 2nd-pass diffraction orders)
+       → two-lens relay (250 mm + 150 mm, demag 0.6) → IP2
+     Monitoring: C1/C2 CMOS cameras (IP1', IP2), PD photodiode (IP2').
 ```
 
 ### 7.1 The Problem: Asymptotic Crosstalk Floor
 
-IFTA optimizes the beam within a finite signal window D. Outside D, binarization artifacts create a uniform noise floor at ~10⁻⁴. For a chain of N ions, the cumulative measurement error grows as N × 10⁻³.
+IFTA optimizes the beam within a finite signal window D. Outside D, binarization artifacts
+create a residual background floor (a nonzero far-wing crosstalk floor). This background
+illumination accumulates across many exposed qubits, contributing an error that grows with
+system size.
 
 ### 7.2 The Concept: Spatial Filtering at an Intermediate Image Plane
 
-Place a sharp aperture (pupil) at an intermediate image plane (IP1). The pupil function is:
+The DMD is reused in a **double-pass** configuration: the first pass (FP1 region) implements
+the multiplexed Fourier-plane hologram; the second pass (IP1 region) implements a
+programmable **reflective square pupil** at an intermediate image plane. ("Double-pass" here
+means the beam interacts twice with different regions of the same reflective DMD.) The pupil
+function is:
 
 ```
 A_pupil(x) = { 1  for |x| ≤ d/2    (within pupil)
@@ -827,60 +893,91 @@ The pupil acts as a rectangular (or circular) aperture. Its Fourier transform se
 Airy radius at IP2 = 1.22 λ f₂ / d_pupil
 ```
 
-For the relay system (f₁ = 250 mm, f₂ = 150 mm) and pupil size d = 2w:
-- The beam at IP2 has an effective aperture d' slightly larger than d due to finite relay NA
-- Measured: d' ≈ 10–14w for the smallest practical pupil sizes
+The relay from IP1 to IP2 uses two lenses (250 mm and 150 mm) giving a demagnification of
+**0.6**, so the waist at IP2 is w' = 0.6·w (e.g. w = 15 μm at IP1 → w' = 9 μm at IP2). The
+imaged pupil is broadened and its edge softened by aberrations and diffraction in the relay,
+so the effective aperture differs from the geometric-optics prediction.
 
 ### 7.4 The DMD as a Dynamic Pupil
 
-Instead of a fixed mechanical iris, we use unused DMD pixels as the pupil:
+Instead of a fixed mechanical iris, the unused IP1 region of the DMD serves as a
+**programmable reflective square pupil**:
 
-**DMD layout:**
+**DMD layout (per the paper):**
 ```
-Columns 0–1960:    Fourier Plane hologram (primary grating)
-Columns 1960–2060: Buffer zone (all OFF)
-Columns 2060–2560: Image Plane 1 pupil
+FP1: columns 0–2060  (1600 × 2060 px) — Fourier-plane hologram
+                       (IFTA in 0–1960, ~100 px guard region up to 2060)
+IP1: columns 2060–2560 (1600 × 500 px) — image-plane reflective pupil
 ```
 
-The retro-reflector board bends the first-order beam from the FP hologram back onto the IP1 region of the same DMD chip. Only mirrors within the pupil circle are turned ON — they reflect the beam toward the relay optics. Mirrors outside the pupil are OFF — the tail light is dumped.
+The retro-reflector bends the first-order beam from FP1 back onto the IP1 region of the same
+DMD chip. Only mirrors within the square pupil are ON (reflect toward the relay); mirrors
+outside are OFF (tail light dumped).
 
-**Advantages:**
-- Dynamic: pupil position and size can be adjusted per-ion without mechanical changes
-- Fast: same switching speed as the hologram (~77 μs)
-- No extra hardware: reuses the existing DMD
+**Beam-center calibration on IP1 (two steps):**
+1. **Coarse search:** turn on successively smaller blocks of mirrors to narrow the beam
+   location.
+2. **Fine linear scan:** turn on individual micromirrors one by one; determine the center
+   from the camera signal at IP2 (a photodiode at IP2' is used to locate the beam center).
+
+**Advantages:** dynamic (position/size adjustable per site, no moving parts); fast (same
+switching speed as the hologram, ~77 μs); no extra hardware (reuses the DMD).
 
 ### 7.5 Aberration in Double-Pass
 
-The second pass through the retro-reflector introduces additional aberrations (Φ₂). The total aberration correction becomes:
+The second pass introduces additional aberrations (Φ₂), so the FP1 hologram uses an aberration
+map characterized all the way to IP2:
 
 ```
-For the FP hologram (first pass):
-  input_profile = exp(1j × (−Φ₀ − Φ₁ + Φ₂))
+input_profile = exp(1j × (−Φ₀ − Φ₁ + Φ₂))
 ```
 
-The sign convention accounts for the reversed beam direction on the second pass. If the signs are wrong (e.g., using +Φ₀ instead of −Φ₀), the aberration **doubles** instead of canceling — a common alignment pitfall.
+The sign convention accounts for the reversed beam direction on the second pass. If the signs
+are wrong (e.g. +Φ₀ instead of −Φ₀), the aberration **doubles** instead of cancelling — a
+common alignment pitfall.
 
 ### 7.6 Effective Aperture
 
-Due to the finite numerical aperture of the f₁+f₂ relay, the effective aperture d' at IP2 is always larger than the physical pupil d at IP1:
+The effective aperture d' at IP2 is **defined** (paper's benchmark) as the distance along the
+ion axis at which the relative intensity crosstalk I_X falls below −50 dB. Because of finite
+relay NA, d' > d always. As the pupil d shrinks, d' shrinks but **saturates at ≈ 14 w'**:
 
 ```
-d'(w) > d(w)  for all practical d
+d ≈ 20w  →  d' ≈ 19w'
+d ≈ 10w  →  d' ≈ 15w'
+d ≈ 5w   →  d' ≈ 14w'   (Fig. 3a: pupil d = 5w gives d' ≈ 14w')
+d ≈ 2.5w →  d' ≈ 13w'   (floor)
 ```
 
-Empirically measured relationship:
-- d = 20w → d' ≈ 20w (relay is wide enough, negligible diffraction)
-- d = 5w → d' ≈ 13w (diffraction broadening becomes significant)
-- d = 2w → d' ≈ 10w (diffraction-limited, minimum effective aperture)
+So the minimum effective aperture is ≈ 13–14 w'. Beyond ~14 w' the double pass drives
+I_X below −50 dB; beyond ~30 w' it approaches −60 dB (10⁻⁶), near the detector noise floor.
 
-The minimum effective aperture (10–14w) determines the range beyond which IX drops to the noise floor (~10⁻⁶). This corresponds to beyond the third nearest neighbor.
+### 7.7 AS2 Iris and Degradation from the Intermediate Image Plane
 
-### 7.7 FP2 Iris Filtering
+**AS1 / AS2 irises.** AS1 (at the input) ensures selective illumination of the FP1 region;
+AS2 (at the intermediate Fourier plane FP2) blocks the unwanted diffraction orders generated
+during the second pass.
 
-An additional iris at the Fourier plane of the f₁+f₂ relay (FP2) further reduces noise:
-- Blocks higher diffraction orders from the DMD micro-mirror structure
-- Reduces scattered light from gaps between mirrors
-- Narrowing from 10 mm to 7 mm diameter significantly improves the noise floor
+**Degradation introduced by the double pass.** Comparing the single-pass (Fig. 2f) and
+double-pass (Fig. 3a) results, the near-field crosstalk **increases by ~6 dB at 4w** when the
+intermediate image plane is introduced. Causes identified in the paper:
+- The IP1 beam waist is very small (~2 DMD pixels), making it hard to block multiple DMD
+  diffraction orders through AS2 while still passing the desired Fourier components.
+- Scattering from the DMD mirror surfaces at IP1.
+- The ON mirrors do not form a continuous plane, introducing additional aberrations.
+
+Crucially, the secondary holograms can still cancel this extra near-field crosstalk by
+destructive interference — demonstrating the robustness of combining both techniques. The
+paper notes this could be further improved by adding aberration compensation between IP1 and
+IP2 (e.g. a deformable mirror).
+
+### 7.8 Combined Strategy and Multi-Qubit Extension
+
+The combined approach — Fourier-plane multiplexing (near sites, within d') plus image-plane
+filtering (far tail) — maintains I_X ≤ −50 dB (10⁻⁵) across the full field and reaches
+≈ −60 dB (10⁻⁶) beyond ~30 w'. The scheme extends to multiple qubits without hardware
+changes: multiple pupils can independently filter well-separated qubits, while a single pupil
+combined with multiplexed secondary holograms can cover several nearby qubits.
 
 ---
 
@@ -942,22 +1039,20 @@ An additional iris at the Fourier plane of the f₁+f₂ relay (FP2) further red
      PERFORMANCE EVOLUTION:
      ━━━━━━━━━━━━━━━━━━━━━
      
-       0 dB ┤ ╭──╮           IFTA            +SecGrating     +DoublPass
+       0 dB ┤ ╭──╮        IFTA        +SecGrating(multiplexed)   +DoublePass
             │╱    ╲
       -20 dB┤      ╲
             │       ╲
-      -40 dB┤        ╲───── 10⁻⁴ ────────── 10⁻⁴·⁹ ──
+    -42.6dB ┤        ╲──── baseline ────
             │
-      -50 dB┤                                          ── inter-ion limit
+      -50 dB┤          multiplexed ≲ −50 dB (10⁻⁵) across field
             │
-      -60 dB┤                                                    10⁻⁶ ──
-            ├──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──
-              0  2w 4w 6w 8w 10w 12w 14w 16w 18w 20w
+      -60 dB┤                                          −60 dB (10⁻⁶) >30w'──
+            ├──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──
+              0  4w  8w  12w 14w      20w         30w
               
-              ◄─── secondary grating ───►
-                   helps here
-                                         ◄─── double-pass pupil ───►
-                                               helps here
+              ◄── multiplexed secondary gratings (±4w,±8w,±12w) ──►
+                                    ◄─── double-pass pupil (>14w') ───►
 ```
 
 ### 8.1 Definition of Intensity Crosstalk
@@ -1017,7 +1112,8 @@ For ¹⁷¹Yb⁺ detection (π polarization affects asset, σ±/π illumination)
 
 Result: I_abs ≈ 2.14 × 10⁻⁵ I_sat
 
-This sets the absolute floor. No optical technique can do better than this. The secondary grating method (IX → 10⁻⁴·⁹) approaches this limit.
+This sets the absolute floor. No optical technique can do better than this. The
+secondary-grating / multiplexing method (IX ≲ 10⁻⁵, −50 dB) approaches this limit.
 
 ### 8.5 Cumulative Error in an Ion Chain
 
@@ -1033,11 +1129,15 @@ If IX saturates at IX_∞ beyond some distance:
 P_AQM,total ≈ N × c × IX_∞ × τ_det
 ```
 
-For N = 30, IX_∞ = 10⁻⁴, τ_det = 11 μs:
-- P_AQM,total ≈ 30 × 4×10⁻³ ≈ 0.12 (12% — unacceptable)
+Using the per-ion relation P_AQM ≈ 10⁻³ at IX = 10⁻⁴ (from Motlakunta 2024; the detection value can be up to ~4×10⁻³ at 11 μs, reset is ~10⁻³):
 
-With double-pass pupil (IX_∞ = 10⁻⁶):
-- P_AQM,total ≈ 30 × 4×10⁻⁵ ≈ 0.0012 (0.12% — excellent)
+For N = 30, IX_∞ = 10⁻⁴:
+- P_AQM,total ≈ 30 × 10⁻³ ≈ 0.03 (≈ 3% — unacceptable for error correction)
+
+With double-pass pupil (IX_∞ = 10⁻⁶, a 100× reduction):
+- P_AQM,total ≈ 30 × 10⁻⁵ ≈ 3×10⁻⁴ (≈ 0.03% — excellent)
+
+(This is an upper bound: it assumes every ion sits at the asymptotic floor IX_∞. In reality, near neighbors dominate and the far ions contribute less, so the true cumulative error is somewhat lower.)
 
 ### 8.6 Error Correction Requirements
 
@@ -1208,26 +1308,26 @@ Typical measurement uncertainty: ±1 dB in the tail region (limited by shot nois
      └──────────┘    │ │2ndry│ │          │      ↑ destructive│
                      │ │grat │ │          │      interference │
                      │ └─────┘ │          └───────────────────┘
-                     └─────────┘          IX ~ 10⁻⁴·⁹ at 4w
-                     Primary + secondary   (+6 dB suppression)
+                     └─────────┘          IX ≲ 10⁻⁵ (−50 dB) at 4w
+                     Primary + secondary   (−42.6→−48 dB single; ≲−50 dB multiplexed)
 
      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      
      LEVEL 5: ADD DOUBLE PASS PUPIL (long range)
      ┌────────┐   ┌──────────────────────────────┐  ┌─────┐  ┌────────┐
-     │ 369 nm │──►│ DMD                          │  │f1+f │  │  Ions  │
-     │ laser  │   │ ┌──────────┐  ┌────────────┐ │─►│relay│─►│ ●●◉●●  │
-     └────────┘   │ │  FP      │  │  IP1 pupil │ │  └─────┘  └────────┘
+     │ 370 nm │──►│ DMD                          │  │relay│  │  IP2   │
+     │ laser  │   │ ┌──────────┐  ┌────────────┐ │─►│0.6× │─►│ ●●◉●●  │
+     └────────┘   │ │  FP1     │  │  IP1 pupil │ │  └─────┘  └────────┘
                   │ │(hologram)│  │  ┌───────┐ │ │
-                  │ │          │◄─┤  │○○○○○○○│ │ │ ← retro-reflected
-                  │ └──────────┘  │  │○pupil○│ │ │    beam lands here
-                  │               │  │○○○○○○○│ │ │
+                  │ │          │◄─┤  │███████│ │ │ ← retro-reflected
+                  │ └──────────┘  │  │█square█│ │ │    beam lands here
+                  │               │  │███████│ │ │
                   │               │  └───────┘ │ │
                   │               └────────────┘ │
                   └──────────────────────────────┘
                   
-                  IX < 10⁻⁶ beyond 14w (noise floor limited)
-                  Approaches fundamental inter-ion scattering limit
+                  IX < −50 dB beyond ~14w' ; → −60 dB (10⁻⁶) beyond ~30w'
+                  Approaches detector noise floor (near inter-ion scattering limit)
 
      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      
@@ -1250,28 +1350,38 @@ Typical measurement uncertainty: ±1 dB in the tail region (limited by shot nois
 
 | Parameter | Symbol | Value | Origin |
 |-----------|--------|-------|--------|
-| Wavelength | λ | 369 nm | Yb⁺ ²S₁/₂ → ²P₁/₂ transition |
-| Focal length | f | 250 mm | Fourier lens |
-| Pixel pitch | Δ | 7.56 μm | DLP9000XUV spec |
-| Array size | N_x × N_y | 2560 × 1600 | DLP9000XUV spec |
-| Grating periodicity | p | 4 pixels | Design choice (trade-off: efficiency vs. separation) |
-| Grating angle | θ | −π/4 rad | Diamond lattice mirror tilt axis |
-| Beam waist (at IP1) | w_IP1 | 9 μm | = 9× demag from w_ion = 1 μm |
-| Beam waist (at ions) | w_ion | 1 μm | ≈ a/4 for 4 μm spacing |
-| Ion-ion separation | a | 4 μm | Trap design (Bloodstone) |
-| Nearest neighbor distance | 4w | 4 μm | = a (by design of w) |
-| Scaling factor | Λ = λf | 92.25 μm·mm | Sets FP↔IP coordinate mapping |
-| Min picture time | — | 77 μs | DDR→DMD transfer (hardware limit) |
-| Mirror settling | — | ~20 μs | Mechanical MEMS transition |
+| Wavelength | λ | 369.5 nm (paper: ≈370 nm; code uses 369 nm) | Yb⁺ ²S₁/₂ → ²P₁/₂ |
+| Focal length (L2) | f | 150 mm or 250 mm | depends on configuration (paper Fig. 2/3) |
+| Pixel pitch | Δ | 7.56 μm (paper: 7.6 μm) | DLP9000XUV datasheet |
+| Array size | N_x × N_y | 2560 × 1600 | DLP9000XUV; physical 19.5 mm × 12.1 mm |
+| FP1 region | — | 1600 × 2060 px | Fourier-plane hologram (paper) |
+| IP1 region | — | 1600 × 500 px | image-plane reflective pupil (paper) |
+| Input collimated waist | — | 10 mm | L1 collimation onto DMD (paper) |
+| Grating periodicity | p | 4 pixels | efficiency vs. separation trade-off |
+| Grating angle | θ | −π/4 rad | diamond-lattice mirror tilt axis |
+| Mirror tilt | — | ±12° | DLP9000XUV |
+| IP1→IP2 demagnification | — | 0.6 | two-lens relay (250 mm + 150 mm) |
+| Beam waist at IP1 | w | 9–30 μm | configuration-dependent (paper) |
+| Beam waist at IP2 | w′ = 0.6w | e.g. 9 μm (from w=15 μm) | after 0.6 relay |
+| Beam waist at ions | w_ion | 1 μm | downstream objective (thesis; not in this paper) |
+| Ion–ion separation | a | 4 μm | Bloodstone trap (nearest neighbor = 4w) |
+| Secondary window | m × l | 2 × 460 px | along transverse × ion axis (paper) |
+| Optimal secondary phase | Φ_s | 2.77π | Fig. 2c fit |
+| Optimal secondary amplitude | A_s | 0.38 | Fig. 2d fit |
+| Effective aperture (min) | d′ | ≈14 w′ | saturates as pupil shrinks (paper Fig. 3b) |
+| Scaling factor | Λ = λf | 92.25 μm·mm (f=250) | FP↔IP mapping |
+| Min picture time | — | 77 μs | DDR→DMD transfer (hardware) |
+| Mirror settling | — | ~20 μs | MEMS transition |
 | Saturation intensity | I_sat | 51 mW/cm² | Yb⁺ ²S₁/₂ → ²P₁/₂ |
 | Linewidth | Γ | 2π × 19.6 MHz | ²P₁/₂ natural linewidth |
-| Detection time | τ_det | 11–20 μs | Limited by photon collection |
-| Reset time | τ_reset | 1–10 μs | Optical pumping to |↓⟩ |
+| Detection time | τ_det | 11–20 μs | limited by photon collection |
+| Reset time | τ_reset | 1–10 μs | optical pumping to \|↓⟩ |
 
 ---
 
 ## References
 
+0. **Mahato, S. & Islam, R. "Achieving 10⁻⁵ level relative intensity crosstalk in optical holographic qubit addressing via a double-pass digital micromirror device." arXiv:2512.13882v1 (2025). — primary reference for the double-pass and multiplexing results.**
 1. Shih, C.-Y. et al. "Reprogrammable and high-precision holographic optical addressing of trapped ions for scalable quantum control." *npj Quantum Information* 7, 57 (2021).
 2. Motlakunta, S. et al. "Preserving a qubit during state-destroying operations on an adjacent qubit at a few micrometers distance." *Nature Communications* 15, 6575 (2024).
 3. Mahato, S. "Mitigating Optical Crosstalk for In-Situ Mid-Circuit Measurement and Reset in a Trapped-Ion Quantum Simulator." MSc Thesis, University of Waterloo, 2025.

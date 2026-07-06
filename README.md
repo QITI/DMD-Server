@@ -112,6 +112,11 @@ This server runs on a Windows PC with GPU and USB access to the Vialux ALP 4.3 c
 
 ## Physics and Theory
 
+> **Primary reference:** S. Mahato and R. Islam, *"Achieving 10⁻⁵ level relative intensity
+> crosstalk in optical holographic qubit addressing via a double-pass digital micromirror
+> device,"* arXiv:2512.13882v1 (2025). Crosstalk figures and parameters below follow this
+> paper. See `theory.md` for the full derivations.
+
 ### Why a DMD? — Fourier Holography for Individual Ion Addressing
 
 A lens performs an optical Fourier transform between its front focal plane (Fourier Plane, FP) and back focal plane (Image Plane, IP). The DMD sits at the FP. The ions live at a plane conjugate to the IP.
@@ -237,43 +242,59 @@ Real optics introduce wavefront aberrations that create sidelobes raising crosst
 
 ### Secondary Grating — Nearest-Neighbor Crosstalk Suppression
 
-Even after IFTA, the nearest neighbor (at 4w ≈ 4 μm) sees ~10⁻⁴ intensity. A secondary grating creates destructive interference at that location:
+Even after IFTA, the nearest neighbor (at 4w) sees ~10⁻⁴ intensity (measured baseline
+−42.6 dB). A secondary grating (a "multiplexed" Fourier hologram) creates destructive
+interference at that location:
 
 ```
-  E_total at neighbor = Ã₁·e^(iφ₁) + Ã₂·e^(iφ₂)
+  E_total at neighbor = Ã₁·e^(iΦ₁) + Ã₂·e^(iΦ_s)   (paper notation: A_s, Φ_s)
 
-  I = Ã₁² + Ã₂² + 2Ã₁Ã₂ cos(φ₁ − φ₂)
+  I = Ã₁² + Ã₂² + 2Ã₁Ã₂ cos(Φ₁ − Φ_s)
 
-  When φ₁ − φ₂ = π and Ã₁ ≈ Ã₂:  I_min = (Ã₁ − Ã₂)² → 0
+  When Φ₁ − Φ_s = π and Ã₁ ≈ Ã₂:  I_min = (Ã₁ − Ã₂)² → 0
 
-  On DMD: secondary grating in a small window (3×400 pixels)
-  Periodicity = cos(π/4) × λ × f / (offset × pixel_size)
-  Optimize: scan phase 0→4π, then fine-tune amplitude.
+  On DMD: secondary binary grating in a small window (m=2 × l=460 pixels,
+          narrow along transverse, long along ion axis; random binarization)
+  Optimize: scan Φ_s 0→4π (optimum 2.77π), then scan A_s (optimum 0.38).
 
-  Result: ~6 dB suppression at nearest neighbor.
+  Result (paper): baseline −42.6 dB → −48 dB with one hologram (~5 dB, up to 10 dB).
+  Multiplexing 6 holograms (±4w,±8w,±12w) → IX ≲ −50 dB (10⁻⁵) at all sites.
 ```
 
-**Significance:** Approaches the inter-ion scattering limit (~10⁻⁵). Can target any neighbor. Multiple gratings can suppress multiple positions simultaneously.
+**Significance:** Approaches the inter-ion scattering limit (~10⁻⁵). Can target any
+neighbor. Up to ~6 secondary holograms have been demonstrated; performance degrades beyond
+~8 (auxiliary-beam overlap and loss of primary Fourier components).
 
 ---
 
 ### Double-Pass Pupil — Long-Range Crosstalk Suppression
 
-Beyond ~10w, intensity saturates at ~10⁻⁴. A physical aperture at IP1 clips the tails:
+Beyond the signal window, intensity saturates at a residual floor (~10⁻⁴) that accumulates
+across many qubits. A programmable **reflective square pupil** at the intermediate image
+plane (IP1) clips the far tail. The same DMD is reused: FP1 region = hologram, IP1 region =
+pupil ("double pass" = two interactions with different regions of one reflective DMD).
 
 ```
-  DMD split: FP hologram (cols 0–1960) | IP1 pupil (cols 2060–2560)
+  DMD split (paper): FP1 = cols 0–2060 (1600×2060 px) | IP1 = cols 2060–2560 (1600×500 px)
+                     (IFTA hologram lives in 0–1960 with a ~100 px guard region up to 2060)
 
   Light path:
-    Input → FP (hologram) → retro-reflector → back to DMD at IP1
-    → only mirrors inside pupil radius are ON → tails blocked
-    → relay to ion plane
+    fiber(370nm)→L1(waist 10mm)→AS1→DMD FP1→L2(f)→retro→DMD IP1[square pupil]
+    →D-mirror→AS2(FP2, blocks 2nd-pass orders)→relay 250+150mm (demag 0.6)→IP2
 
-  Without pupil: IX ~ 10⁻⁴ everywhere beyond signal window
-  With pupil:    IX ~ 10⁻⁶ beyond 14w (camera noise floor)
+  Effective aperture d' (distance where IX < −50 dB) saturates at ≈14w' as pupil shrinks.
+  Result: IX < −50 dB beyond ~14w' ; approaches −60 dB (10⁻⁶) beyond ~30w' (noise floor).
 ```
 
-**Significance:** For 30 ions, reduces cumulative error from ~3% to ~0.3%. Essential for multi-round error correction.
+**Caveat (from the paper):** introducing the intermediate image plane raises near-field
+crosstalk by ~6 dB at 4w (small IP1 waist ≈2 DMD pixels; hard to block DMD diffraction orders
+through AS2; scattering and non-planar ON mirrors add aberration). The secondary holograms
+still cancel this extra near-field crosstalk, so the combined scheme holds IX ≤ −50 dB across
+the full field.
+
+**Significance:** For a 30-ion chain, reduces cumulative error from ~3% to ~0.03% (100× lower
+IX). The demonstration is optical (characterized to IP2); relaying to ions and using them for
+fine-tuning is future work.
 
 ---
 
@@ -298,9 +319,10 @@ Single exposure: ~10³ dynamic range. To verify IX = 10⁻⁶, combine multiple 
   ┌──────────────────────────────────────────────────────────────────────┐
   │  Method                     │  IX        │  P_AQM     │  Fidelity   │
   ├─────────────────────────────┼────────────┼────────────┼─────────────┤
-  │  IFTA alone                 │  < 10⁻⁴    │  < 4×10⁻³  │  99.6%      │
-  │  + secondary grating        │  ~ 10⁻⁴·⁹  │  ~ 1×10⁻³  │  99.9%      │
-  │  + double-pass pupil        │  < 10⁻⁶    │  < 10⁻⁵    │  >99.99%    │
+  │  IFTA alone (baseline)      │ −42.6 dB   │  < 4×10⁻³  │  99.6%      │
+  │  + secondary (single)       │  −48 dB    │  ~ 1×10⁻³  │  99.9%      │
+  │  + secondary (multiplexed)  │ ≲ 10⁻⁵     │  ~ 1×10⁻³  │  99.9%      │
+  │  + double-pass pupil        │ <10⁻⁶ far  │ scatt-lim  │  >99.99%    │
   │  Fundamental limit          │  ~ 10⁻⁵    │  ~ 2×10⁻⁵  │  99.998%    │
   └─────────────────────────────┴────────────┴────────────┴─────────────┘
 
@@ -481,11 +503,11 @@ Single exposure: ~10³ dynamic range. To verify IX = 10⁻⁶, combine multiple 
 │   DMD state: [══════ primary grating ══════[SG]══════════════════════]       │
 │                                             ↑                                │
 │                                    secondary grating                         │
-│                                    (3×400 pixel window)                      │
-│                                    phase: 0→4π (scanned)                     │
-│                                    amplitude: 0→1                            │
+│                                    (m=2 × l=460 pixel window)                │
+│                                    phase Φ_s: 0→4π (optimum 2.77π)           │
+│                                    amplitude A_s: 0→1 (optimum 0.38)         │
 │                                                                              │
-│   Result: IX reduced by ~6 dB at nearest neighbor (4w)                       │
+│   Result: −42.6 dB → −48 dB (single, ~5 dB); multiplexed ≲ −50 dB (10⁻⁵)    │
 │                                                                              │
 │   Server methods:                                                            │
 │     configure_secondary_grating(phase, amplitude, position_offset)           │
@@ -496,15 +518,16 @@ Single exposure: ~10³ dynamic range. To verify IX = 10⁻⁶, combine multiple 
 │   MODE 3: DOUBLE PASS (long-range suppression)                               │
 │   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                              │
 │                                                                              │
-│   DMD regions:                                                               │
-│   ◄─── FP (cols 0–1960) ───►◄─ buffer ─►◄── IP1 pupil (cols 2060–2560) ──►   │
-│   [══ IFTA hologram ════════]  [░░░░░░]  [○○○ circular pupil ○○○○○○○○○]      │
+│   DMD regions (paper):                                                       │
+│   ◄──── FP1 (cols 0–2060, 1600×2060) ────►◄── IP1 (cols 2060–2560, ×500) ─►  │
+│   [══ IFTA hologram (0–1960) + guard ════]  [███ reflective SQUARE pupil ██] │
 │                                                     ↑                        │
-│                                           center, radius (tunable)           │
+│                                           center, size d (tunable)           │
 │                                                                              │
-│   Light path: FP → retro-reflector → IP1 (pupil clips tails) → relay → IP2   │
+│   Light path: FP1 → retro-reflector → IP1 (square pupil clips tails)         │
+│               → AS2 (FP2) → relay 250+150mm (demag 0.6) → IP2                │
 │                                                                              │
-│   Result: IX < 10⁻⁶ beyond 14w (third nearest neighbor)                      │
+│   Result: IX < −50 dB beyond ~14w' ; → −60 dB (10⁻⁶) beyond ~30w'           │
 │                                                                              │
 │   Server methods:                                                            │
 │     configure_double_pass_pupil(center_row, center_col, radius)              │
