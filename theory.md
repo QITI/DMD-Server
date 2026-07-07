@@ -9,6 +9,18 @@ This document provides the complete optical and mathematical background for ever
 > effective aperture, window sizes, optimized parameters) in this document are taken from
 > that paper. The paper characterizes the optical system up to the second image plane
 > (IP2); relaying to actual ions is future work.
+>
+> **Foundational reference.** The core method on which this system is built —
+> the DMD Fourier-holography addressing scheme, the specific high-precision IFTA, and
+> *in-situ* aberration characterization using the trapped ions themselves as the
+> wavefront sensor — was established in: C.-Y. Shih *et al.*, *"Reprogrammable and
+> high-precision holographic optical addressing of trapped ions for scalable quantum
+> control,"* npj Quantum Information **7**, 57 (2021) (and the earlier MSc thesis,
+> Shih 2019). That work introduced an IFTA giving **>1 order of magnitude** accuracy
+> improvement over prior hologram algorithms, demonstrated a baseline relative intensity
+> crosstalk of $\sim 10^{-4}$ ($-40$ dB), and introduced a DMD+AOM scheme for
+> multi-frequency addressing. The Mahato & Islam paper extends this baseline downward with
+> secondary-grating multiplexing and double-pass pupil filtering.
 
 ### Headline results (from the paper)
 
@@ -388,6 +400,12 @@ For r → ∞: approaches hard threshold. For r ~ 10: smooth transition.
 
 ### 4.4 IFTA (Iterative Fourier Transform Algorithm)
 
+> **Origin.** The specific IFTA used here was developed by Shih *et al.* (npj QI 7, 57,
+> 2021), building on the Lee/Wyrowski amplitude-hologram tradition and the Gerchberg–Saxton
+> family. Shih's version demonstrated **more than an order of magnitude** improvement in
+> addressing accuracy over previously proposed algorithms, and is what first brought the
+> DMD baseline crosstalk down to $\sim 10^{-4}$ ($-40$ dB) for trapped-ion addressing.
+
 IFTA iteratively refines the binarization to minimize errors within a signal window D:
 
 **Algorithm:**
@@ -436,6 +454,43 @@ As i increases, t goes from 0 (no binarization) to 0.5 (full binarization). The 
 | Simple threshold | ~10⁻² | ~10⁻² | Instant | Never (testing only) |
 | Random (r=10) | ~10⁻³ | ~10⁻³ | ~100 ms | Calibration, quick tests |
 | IFTA (N=2000) | < 10⁻⁴ | ~10⁻³ | ~6 s (GPU) | Production holograms |
+
+### 4.6 Multi-Frequency Addressing via DMD Zones + AOM
+
+A single static DMD hologram produces one addressing beam pattern at one optical frequency.
+Multi-qubit entangling gates (e.g. Mølmer–Sørensen) require **multiple frequency tones**
+delivered to selected ions simultaneously. Shih *et al.* (npj QI 7, 57, 2021) introduced a
+scheme that pairs the DMD with an **acousto-optic modulator (AOM)** to achieve this without
+any additional spatial light modulators:
+
+```
+     AOM splits input into angularly separated, frequency-shifted copies
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                          ┌─────── f₀+δ₁ ──►  DMD ZONE A  ─┐
+        input   ┌─────┐   │                   (hologram A) │
+        beam ──►│ AOM │───┼─────── f₀+δ₂ ──►  DMD ZONE B  ─┤──► lens ──► ions
+                └─────┘   │                   (hologram B) │            ● ● ● ●
+                (multi-   └─────── f₀+δ₃ ──►  DMD ZONE C  ─┘             ↑ ↑
+                 tone RF)                                              each tone
+                                                                       lands on its
+     Each AOM tone illuminates a DIFFERENT spatial zone of the DMD.    targeted ion(s)
+     Each zone carries an INDEPENDENT hologram (own target ion set).
+     A given ion can therefore receive several frequency tones at once.
+```
+
+**Principle:** driving the AOM with several RF tones produces several first-order beams at
+slightly different angles and different optical frequencies. By arranging the geometry so
+each angularly-separated copy lands on a **distinct region (zone) of the DMD**, and by
+writing an independent hologram in each zone, each optical frequency becomes an independent
+addressing channel. The lens then superimposes the zone outputs at the ion plane, so a
+single ion can be illuminated by a programmable set of frequency tones — the requirement for
+spin-dependent forces and arbitrary spin–spin coupling graphs.
+
+**Significance:** this turns the DMD from a single-frequency amplitude shaper into a
+reconfigurable *multi-frequency* addressing system, enabling parallel single-qubit rotations
+and multi-qubit entangling operations with arbitrary connectivity, all reprogrammable in
+software.
 
 ---
 
@@ -576,6 +631,48 @@ The total aberration is measured in stages:
 - Double pass: input_profile = exp(1j × (−Φ₀ − Φ₁ + Φ₂))
 
 The sign flip in double-pass is because the light traverses the system in reverse on the second pass.
+
+### 5.5a In-Situ Characterization Using the Ions Themselves
+
+The camera-based two-patch interferometry above measures aberrations *up to the imaging
+camera*. The residual wavefront error at the *ion plane* — the plane that actually matters —
+can differ, because the relay optics and vacuum viewport between the camera-conjugate plane
+and the ions add their own aberrations that no camera in the addressing path can see.
+
+Shih *et al.* (npj QI 7, 57, 2021) resolved this by using **the trapped ions as the
+wavefront probe**. Instead of (or in addition to) a camera, the figure of merit is measured
+directly on the ions:
+
+```
+     CAMERA-BASED (up to imaging plane)      ION-BASED (all the way to the ion)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+     DMD ─► optics ─► [camera]               DMD ─► optics ─► viewport ─► [ion]
+                        │                                                  │
+              fringe phase map                          AC Stark shift  /
+              Φ(ξ,η) to camera                          fluorescence  /  Rabi rate
+                                                        at neighbor site
+
+     Blind to viewport +                     Sees the complete wavefront
+     relay aberrations                       error, including everything
+     downstream of the camera                between DMD and ion
+```
+
+**How the ion reports crosstalk / aberration.** A beam aimed at a *target* ion leaks a
+small field onto its *neighbor*. That leakage is measured on the neighbor by any
+intensity-sensitive observable — the light shift (AC Stark shift) it induces, the
+depumping/scattering rate, or the residual Rabi rate. Minimizing this observable while
+scanning the encoded aberration terms (or the secondary-grating parameters, Section 6)
+tunes the correction against the *true* end-to-end optical system. Shih *et al.* reported
+that this in-situ, ion-referenced procedure reached relative intensity crosstalk at the
+$\sim 10^{-4}$ level — the baseline that the multiplexing and double-pass techniques of this
+document then push further.
+
+**Practical consequence for this server.** The `Φ₀/Φ₁/Φ₂` maps loaded at startup are the
+camera-derived starting point. A final in-situ refinement loop (scan → measure on the ion →
+update) is the intended production calibration path once the beam reaches ions; it is the
+reason the aberration maps and secondary-grating parameters are exposed as reloadable
+server state rather than baked into a fixed hologram.
 
 ### 5.6 Zernike Decomposition
 
@@ -989,13 +1086,13 @@ combined with multiplexed secondary holograms can cover several nearby qubits.
      
      Addressing beam intensity profile:
      
-                        ╭────╮
-                       ╱      ╲
-                      ╱        ╲
-                     ╱          ╲
-              ─────╱──────────────╲─────────────────── noise floor
-                  ╱                ╲
-     ━━━━━━━━━━━╱━━━━━━━━━━━━━━━━━━╲━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                  ╭──────╮
+                                 ╱        ╲
+                                ╱          ╲
+                               ╱            ╲
+                         ─────╱──────────────╲─────────────────── noise floor
+                             ╱                ╲
+     ━━━━━━━━━━━━━━━━━━━━━━━╱━━━━━━━━━━━━━━━━━━╲━━━━━━━━━━━━━━━━━━━
      ions:   ●       ●       ●       ●       ●       ●       ●
             -3a     -2a     -a      0 (x₀)   +a     +2a     +3a
                                     ▲         ▲
@@ -1382,7 +1479,7 @@ Typical measurement uncertainty: ±1 dB in the tail region (limited by shot nois
 ## References
 
 0. **Mahato, S. & Islam, R. "Achieving 10⁻⁵ level relative intensity crosstalk in optical holographic qubit addressing via a double-pass digital micromirror device." arXiv:2512.13882v1 (2025). — primary reference for the double-pass and multiplexing results.**
-1. Shih, C.-Y. et al. "Reprogrammable and high-precision holographic optical addressing of trapped ions for scalable quantum control." *npj Quantum Information* 7, 57 (2021).
+1. **Shih, C.-Y. et al. "Reprogrammable and high-precision holographic optical addressing of trapped ions for scalable quantum control." *npj Quantum Information* 7, 57 (2021). https://www.nature.com/articles/s41534-021-00396-0 — foundational reference: high-precision IFTA (>1 order of magnitude accuracy gain over prior algorithms), in-situ aberration characterization using the ions as the wavefront sensor (baseline IX ~ 10⁻⁴), and DMD+AOM multi-frequency zone addressing.**
 2. Motlakunta, S. et al. "Preserving a qubit during state-destroying operations on an adjacent qubit at a few micrometers distance." *Nature Communications* 15, 6575 (2024).
 3. Mahato, S. "Mitigating Optical Crosstalk for In-Situ Mid-Circuit Measurement and Reset in a Trapped-Ion Quantum Simulator." MSc Thesis, University of Waterloo, 2025.
 4. Zupancic, P. et al. "Ultra-precise holographic beam shaping for microscopic quantum control." *Optics Express* 24(13), 13881–13893 (2016).

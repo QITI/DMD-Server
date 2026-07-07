@@ -116,6 +116,14 @@ This server runs on a Windows PC with GPU and USB access to the Vialux ALP 4.3 c
 > crosstalk in optical holographic qubit addressing via a double-pass digital micromirror
 > device,"* arXiv:2512.13882v1 (2025). Crosstalk figures and parameters below follow this
 > paper. See `theory.md` for the full derivations.
+>
+> **Foundational reference:** C.-Y. Shih et al., *"Reprogrammable and high-precision
+> holographic optical addressing of trapped ions for scalable quantum control,"* npj Quantum
+> Information **7**, 57 (2021). This is the origin of the DMD Fourier-holography addressing
+> method used here: the high-precision IFTA (>1 order of magnitude accuracy gain over prior
+> algorithms), the ~10⁻⁴ (−40 dB) baseline crosstalk, *in-situ* aberration characterization
+> using the trapped ions themselves as the wavefront sensor, and the DMD+AOM scheme for
+> multi-frequency addressing. Everything below builds on that work.
 
 ### Why a DMD? — Fourier Holography for Individual Ion Addressing
 
@@ -137,6 +145,14 @@ A lens performs an optical Fourier transform between its front focal plane (Four
 The relationship: each spatial frequency component on the DMD maps to a specific position at the image plane. By creating a carefully designed binary amplitude grating, we engineer the wavefront so the first diffraction order forms a tightly focused Gaussian beam at a chosen ion position.
 
 **Why this matters:** Unlike a simple focused beam, holographic addressing allows aberration correction, beam shaping, and repositioning — all by reprogramming the DMD pattern, with no moving optics.
+
+**Multi-frequency addressing (DMD zones + AOM).** For entangling gates (Mølmer–Sørensen)
+each ion may need several frequency tones at once. Shih et al. (2021) pair the DMD with an
+AOM: multiple RF tones split the input into angularly-separated, frequency-shifted copies,
+each landing on a **different zone of the DMD** carrying its own hologram. Each optical
+frequency becomes an independent addressing channel, and the lens superimposes the zone
+outputs at the ion plane — enabling parallel single-qubit rotations and arbitrary spin–spin
+coupling graphs, all reprogrammable in software. See `theory.md` §4.6.
 
 ---
 
@@ -235,6 +251,17 @@ Real optics introduce wavefront aberrations that create sidelobes raising crosst
   First-order beam emerges aberration-free (math guarantees cancellation).
   After compensation: residual < 0.2λ RMS (~50× improvement).
 ```
+
+**In-situ refinement with the ions (Shih et al. 2021).** The camera-based fringe method only
+sees aberrations up to the imaging plane — it is blind to the viewport and relay optics
+between that plane and the ions. Shih et al. closed this gap by using **the trapped ions
+themselves as the wavefront sensor**: a beam aimed at a target ion leaks onto its neighbor,
+and that leakage is measured directly via the AC Stark shift / scattering rate on the
+neighbor ion. Scanning the encoded aberration (and secondary-grating) parameters to minimize
+that ion-measured leakage tunes the correction against the true end-to-end system, and is
+what first reached the ~10⁻⁴ baseline. This is why the server keeps aberration maps and
+secondary-grating parameters as reloadable state — the production calibration path is a
+scan → measure-on-ion → update loop.
 
 **Significance:** Without this, the beam has severe sidelobes. With it, diffraction-limited quality. Must be re-measured when optics are realigned or temperature drifts.
 
@@ -801,3 +828,15 @@ dmd-server/
 - [ALP4lib](https://github.com/QITI/ALP4lib) — Vialux hardware driver
 - [Bloodstone-Control-Artiq](https://github.com/QITI/Bloodstone-Control-Artiq) — Experiment control system
 - [Bloodstone_DMD](https://github.com/QITI/Bloodstone_DMD) — Experiment scripts and analysis
+
+---
+
+## References
+
+1. **C.-Y. Shih et al.**, "Reprogrammable and high-precision holographic optical addressing of trapped ions for scalable quantum control," *npj Quantum Information* **7**, 57 (2021). [nature.com/articles/s41534-021-00396-0](https://www.nature.com/articles/s41534-021-00396-0) — *foundational method: high-precision IFTA, in-situ ion-referenced aberration correction (baseline IX ~ 10⁻⁴), DMD+AOM multi-frequency addressing.*
+2. **S. Mahato and R. Islam**, "Achieving 10⁻⁵ level relative intensity crosstalk in optical holographic qubit addressing via a double-pass digital micromirror device," arXiv:2512.13882v1 (2025) — *primary reference for secondary-grating multiplexing and double-pass pupil filtering; all crosstalk figures in this README follow this paper.*
+3. **S. Mahato**, "Mitigating Optical Crosstalk for In-Situ Mid-Circuit Measurement and Reset in a Trapped-Ion Quantum Simulator," MSc Thesis, University of Waterloo (2025).
+4. **C.-Y. Shih**, "Holographic Optical Manipulation of Trapped Ions for Quantum Simulation," MSc Thesis, University of Waterloo (2019).
+5. **P. Zupancic et al.**, "Ultra-precise holographic beam shaping for microscopic quantum control," *Optics Express* **24**(13), 13881 (2016).
+
+See `theory.md` for the complete derivations and the full reference list.
