@@ -1,0 +1,33 @@
+# Conda environment for the DMD NDSP server.
+#
+#   conda env create -f environment.yml
+#   conda activate dmd-server
+#
+# Python is pinned to 3.10 (well within TensorFlow 2.x support). The heavy
+# scientific stack is taken from conda-forge; ARTIQ/Vialux/GitHub packages are
+# installed via pip.
+#
+# Still required separately (not installable here):
+#   - Vialux ALP 4.3 SDK (provides alp4395.dll) on the Windows control PC
+#   - PySpin (FLIR Spinnaker SDK) if using camera/HDR features
+#   - a GPU-enabled TensorFlow if IFTA GPU acceleration is needed
+#     (native Windows GPU: tensorflow<=2.10)
+name: dmd-server
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - numpy>=1.23
+  - scipy>=1
+  - matplotlib>=3
+  - pip
+  - pip:
+      - "sipyco @ git+https://git.m-labs.hk/M-Labs/sipyco.git"
+      - ALP4lib
+      - tensorflow            # CPU build; see notes for Windows GPU (<=2.10)
+      - "pySLM2 @ git+https://github.com/QITI/pySLM2"
+      # Editable local alternative (clones in this workspace):
+      # - "-e ../pySLM2"
+      # - "-e ../ALP4lib"
+      # Install this server itself:
+      - "-e ."

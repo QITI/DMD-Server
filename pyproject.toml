@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dmd-server"
+version = "0.1.0"
+description = "ARTIQ NDSP server for the Vialux DLP9000XUV DMD (Bloodstone trapped-ion processor)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "QITI Lab, University of Waterloo" }]
+keywords = ["DMD", "Vialux", "ARTIQ", "trapped-ion", "holography", "NDSP", "sipyco"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+# Direct imports of the server. pySLM2 transitively brings scipy, matplotlib and
+# tensorflow (its own declared dependencies), so they are not repeated here.
+dependencies = [
+    "numpy >= 1.23",
+    "sipyco @ git+https://git.m-labs.hk/M-Labs/sipyco.git",  # ARTIQ RPC transport (M-Labs)
+    "ALP4lib",                                         # Vialux DMD driver (needs alp4395.dll at runtime)
+    "pySLM2 @ git+https://github.com/QITI/pySLM2",     # hologram engine (pulls scipy/matplotlib/tensorflow)
+]
+
+[project.optional-dependencies]
+# GPU-accelerated IFTA. On native Windows, TensorFlow GPU requires tensorflow<=2.10.
+gpu = ["tensorflow<=2.10"]
+# Developer tooling.
+dev = ["build", "twine", "pytest"]
+# NOTE: the FLIR camera dependency "PySpin" (Spinnaker SDK) is NOT on PyPI and
+# cannot be declared here. Install it manually from Teledyne FLIR — see README.
+
+[project.scripts]
+dmd-server = "dmd_server:main"
+
+[project.urls]
+Homepage = "https://github.com/QITI"
+pySLM2 = "https://github.com/QITI/pySLM2"
+ALP4lib = "https://github.com/wavefrontshaping/ALP4lib"
+
+[tool.setuptools]
+# Flat modules (not a package directory).
+py-modules = ["dmd_server", "artiq_stubs"]

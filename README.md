@@ -603,26 +603,69 @@ AOM (addressing laser):
 
 ### Prerequisites
 
-- Windows 10/11 (required for Vialux ALP DLL)
-- Python 3.9+
-- NVIDIA GPU with CUDA (for IFTA acceleration)
+- Windows 10/11 (required for the Vialux ALP DLL)
+- Python 3.9–3.11 (TensorFlow 2.x constraint; pySLM2 requires `tensorflow>2`)
+- NVIDIA GPU with CUDA (optional, for IFTA acceleration)
 - Vialux ALP 4.3 SDK installed (provides `alp4395.dll`)
 - USB 3.0 connection to the Vialux V-9001 module
 
-### Install dependencies
+### Dependency map
+
+| Package | Source | Notes |
+|---------|--------|-------|
+| `numpy` | PyPI | core |
+| `sipyco` | [M-Labs git](https://git.m-labs.hk/M-Labs/sipyco.git) | ARTIQ RPC transport (`simple_server_loop`) |
+| `ALP4lib` | PyPI / [GitHub](https://github.com/wavefrontshaping/ALP4lib) | Vialux driver; needs `alp4395.dll` at runtime |
+| `pySLM2` | [GitHub (QITI)](https://github.com/QITI/pySLM2) | hologram engine; pulls in `scipy`, `matplotlib`, `tensorflow` |
+| `tensorflow` | PyPI | transitive via pySLM2; native-Windows GPU needs `tensorflow<=2.10` |
+| `PySpin` | Teledyne FLIR SDK | **optional** (camera/HDR); not on PyPI — install manually |
+
+The server itself only imports `numpy`, `sipyco`, `ALP4`, and `pySLM2`; `scipy`,
+`matplotlib`, and `tensorflow` arrive as pySLM2's own dependencies.
+
+### Option A — pip + virtualenv (recommended)
 
 ```bash
-pip install sipyco numpy scipy matplotlib
+python -m venv .venv
+# Windows:  .venv\Scripts\activate     Linux/macOS:  source .venv/bin/activate
+pip install -r requirements.txt        # core + ALP4lib + pySLM2 (from GitHub)
+pip install -e .                        # install this server (adds the `dmd-server` command)
+```
 
-# pySLM2 (from the QITI repo)
-cd /path/to/pySLM2
+### Option B — conda
+
+```bash
+conda env create -f environment.yml
+conda activate dmd-server
+```
+
+### Option C — editable local clones
+
+If `pySLM2` and `ALP4lib` are already checked out next to this repo:
+
+```bash
+pip install -e ../pySLM2 -e ../ALP4lib
 pip install -e .
+```
 
-# ALP4lib (from the QITI repo)
-pip install ALP4lib
+### Optional components
 
-# TensorFlow with GPU support (for IFTA)
-pip install tensorflow[and-cuda]
+```bash
+# GPU IFTA acceleration (native Windows GPU requires TF <= 2.10):
+pip install "tensorflow<2.11"          # Windows GPU
+# pip install "tensorflow[and-cuda]"   # Linux GPU
+
+# FLIR camera / HDR imaging — PySpin is NOT on PyPI:
+#   download the Spinnaker SDK + matching wheel from Teledyne FLIR, then:
+pip install spinnaker_python-<version>-cp3XX-*.whl
+```
+
+After installation you can launch either with the entry point or directly:
+
+```bash
+dmd-server --port 12345                 # console script (from pip install .)
+python dmd_server.py --port 12345       # equivalent direct invocation
+python dmd_server.py --simulation       # no hardware (development)
 ```
 
 ### ALP4lib bug fix (required for FLUT)
@@ -819,6 +862,12 @@ dmd-server/
 ├── dmd_server.py         # NDSP server (all capabilities)
 ├── artiq_stubs.py        # Kernel stubs + example experiment
 ├── test_dmd_server.py    # Integration test suite
+├── pyproject.toml        # packaging + `dmd-server` entry point + dependencies
+├── requirements.txt      # pip runtime dependencies
+├── environment.yml       # conda environment
+├── preliminary_test/     # standalone DMD↔PC connection tests (upload + FLUT)
+├── theory.md             # full optical theory
+├── DMD_Documentation.tex # combined LaTeX document
 └── README.md             # This file
 ```
 
