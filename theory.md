@@ -556,7 +556,13 @@ These aberrations are modeled as a phase map Φ_ab(k) at the FP:
 E_in(k) = A_in(k) · exp(iΦ_ab(k))
 ```
 
-where A_in(k) is the (real) amplitude profile of the illumination (typically Gaussian).
+where A_in(k) is the (real) amplitude profile of the illumination. It is nominally Gaussian,
+but it is also **measured**, not just assumed: during the zeroth-order scan each scan patch is
+additionally imaged *alone*, and its total (background-subtracted) camera counts give the
+local reflected intensity. Interpolating these across the DMD and taking the square root
+(intensity → field) yields the amplitude map A_in used in the 1/E_in(k) term of the grating
+equation (Section 3.1). This corrects the hologram for the real, non-uniform illumination
+across the DMD.
 
 ### 5.2 Effect on the Beam
 
@@ -616,15 +622,45 @@ Phase difference = arg(C)
 
 **Building the full map:** Fix one patch (reference, at center of DMD). Scan the second patch across a grid of positions. At each position, extract φ_scan − φ_ref. This builds a 2D relative phase map.
 
+**How this is actually implemented (calibration code).** The bench procedure that produces
+the maps (see `experiment_scans/exp_scan.md`) refines the idealized integral above in four
+ways that matter for accuracy:
+
+1. **Background subtraction.** Each fringe frame is corrected as
+   `fringe = img − img_ref + bg` (a global DMD-OFF background `bg` and a reference frame
+   `img_ref`) to remove static illumination and DC offset before correlation.
+2. **Globally-fitted fringe frequency.** Rather than trusting a noisy per-frame FFT peak, the
+   fringe frequency is first estimated per frame (`freq_estimate`: FFT peak + optional
+   least-squares) and then fit to a *linear* model across the whole scan grid,
+   `f(i,j) = a·(i − i_ref) + b·(j − j_ref)`, because the fringe frequency is proportional to
+   patch separation. Outliers (fit residual > 10⁻²) are rejected and the model is refit. The
+   correlation phase at each point then uses this *fitted* frequency, which keeps the
+   reference consistent across the grid. The fitted slope (a, b) also encodes the λf scaling
+   (Sections 1.2, 3.3), so this step doubles as a focal-length/geometry check.
+3. **2-D phase unwrapping.** The scattered `arg(C)` values are reshaped onto the scan grid and
+   unwrapped (2-D `unwrap_phase`) to remove 2π discontinuities, then interpolated (bicubic) to
+   the full DMD grid.
+4. **Detrending.** A best-fit plane (piston + tip/tilt) is subtracted from the map
+   (`derend2D`). Piston and linear tilt carry *no beam-quality information* — a global tilt
+   only translates the beam at the image plane — so the stored map is a **detrended relative
+   phase**, not an absolute one. The first-order scan additionally averages several repeats
+   and median-filters to suppress noise.
+
+The map is therefore defined only up to an overall piston and tilt (which are physically
+irrelevant), and its transverse resolution is set by the scan grid, not the pixel pitch
+(Section 5.7).
+
 ### 5.5 Multi-Stage Aberration Characterization
 
 The total aberration is measured in stages:
 
-**Φ₀ (zeroth-order map):** Measures aberrations from the input source through the lens to the camera. Both patches have trivial (no-grating) patterns. The fringe encodes path-length differences.
+**Φ₀ (zeroth-order map):** Measures aberrations from the input source through the lens to the camera. Both patches are **flat ON squares** with *no grating* (in the code: small 8×8-pixel squares on a 20-pixel grid). The fringe encodes path-length differences of the undiffracted light.
 
-**Φ₁ (first-order map):** Patches now display grating patterns that produce first-order beams. This adds the aberration from the diffraction process itself (e.g., the non-flat DMD surface affects different orders differently).
+**Φ₁ (first-order map):** The patches now display **grating patterns that produce first-order beams** (in the code: larger circular grating patches), so the fringe carries the aberration of the diffraction path itself (e.g., the non-flat DMD surface affects the diffracted order differently). Crucially, these grating patches are generated **with Φ₀ already applied**, so the fringe phase isolates the *incremental* first-order aberration rather than re-measuring Φ₀. The two maps then add: the correction encodes Φ₀ + Φ₁. Because the first-order signal is weaker, this scan uses larger patches, a coarser grid, and several repeats that are averaged.
 
 **Φ₂ (second-pass map, double-pass only):** Same process but after the retro-reflected beam returns to the DMD. Captures additional aberrations from the retro-reflector optics.
+
+> The patches are scanned only over the Fourier-plane hologram region (DMD columns ~0–1960, with the reference patch at the region centre), matching the FP1/IP1 split used for double-pass (Section 7.4). Detrending (Section 5.4) means each stage is a relative map; adding Φ₀ + Φ₁ is valid because both are referenced to the same central patch.
 
 **Combined correction:**
 - Single pass: input_profile = exp(1j × (Φ₀ + Φ₁))
@@ -692,13 +728,22 @@ Typically dominant in our system: astigmatism and defocus. The residual after co
 
 ### 5.7 Spatial Resolution of Aberration Correction
 
-The DMD pixel pitch (7.56 μm) sets the resolution of the aberration map. The patch size used for measurement (typically 8×8 pixels) and grid spacing (typically 20 pixels) determine:
+The transverse resolution of the aberration map is set by the **scan grid spacing**, not the
+DMD pixel pitch — between grid points the phase is interpolated (bicubic). The two scans use
+different sampling:
 
 ```
-Phase map resolution = grid_spacing × pixel_size = 20 × 7.56 μm = 151 μm
+Zeroth-order (Φ₀): patch 8×8 px,  grid spacing 20 px → 20 × 7.56 μm ≈ 151 μm
+First-order  (Φ₁): larger circular patches, grid spacing 25 px → ≈ 189 μm
 ```
 
-This is much finer than a Shack-Hartmann wavefront sensor (micro-lens diameter > 150 μm). The DMD-based measurement resolves aberrations at a scale matched to the hologram pixel size.
+(The analysis code uses a 7.6 μm pitch; 7.56 μm is the datasheet value — the difference is
+negligible here.) The sampling is chosen as a trade-off: finer grids resolve higher-order
+aberration but need more images and give weaker per-patch signal. Even the coarser first-order
+grid is comparable to or finer than a Shack–Hartmann sensor (micro-lens diameter > 150 μm).
+As noted in Section 5.4, the stored map is a **detrended relative phase** (piston and tilt
+removed), so it captures the beam-shaping-relevant curvature rather than an absolute
+wavefront.
 
 ---
 
