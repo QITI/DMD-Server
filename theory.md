@@ -640,15 +640,18 @@ ways that matter for accuracy:
 3. **2-D phase unwrapping.** The scattered `arg(C)` values are reshaped onto the scan grid and
    unwrapped (2-D `unwrap_phase`) to remove 2π discontinuities, then interpolated (bicubic) to
    the full DMD grid.
-4. **Detrending.** A best-fit plane (piston + tip/tilt) is subtracted from the map
-   (`derend2D`). Piston and linear tilt carry *no beam-quality information* — a global tilt
-   only translates the beam at the image plane — so the stored map is a **detrended relative
-   phase**, not an absolute one. The first-order scan additionally averages several repeats
-   and median-filters to suppress noise.
+4. **Detrending (context-dependent).** A best-fit plane (piston + tip/tilt) can be subtracted
+   (`derend2D`), because piston and linear tilt carry *no beam-quality information* — a global
+   tilt only translates the beam at the image plane. This detrending **is** applied to the
+   $\Phi_1$ scan (and to diagnostic products), but the **production $\Phi_0$ feedback map is
+   kept unaltered** (with its piston/tilt): the current Stage-0 package saves an unaltered
+   "V0" map for feedback and a separate detrended "V1" map for diagnostics only. The
+   first-order scan additionally averages several repeats and median-filters to suppress
+   noise.
 
-The map is therefore defined only up to an overall piston and tilt (which are physically
-irrelevant), and its transverse resolution is set by the scan grid, not the pixel pitch
-(Section 5.7).
+Either way the map is a **relative** phase, referenced to the fixed central patch (the
+reference-overlap point is used only as the gauge $\phi(\mathrm{ref})=0$, not as a measured
+sample). Its transverse resolution is set by the scan grid, not the pixel pitch (Section 5.7).
 
 ### 5.5 Multi-Stage Aberration Characterization
 
@@ -741,9 +744,9 @@ First-order  (Φ₁): larger circular patches, grid spacing 25 px → ≈ 189 μ
 negligible here.) The sampling is chosen as a trade-off: finer grids resolve higher-order
 aberration but need more images and give weaker per-patch signal. Even the coarser first-order
 grid is comparable to or finer than a Shack–Hartmann sensor (micro-lens diameter > 150 μm).
-As noted in Section 5.4, the stored map is a **detrended relative phase** (piston and tilt
-removed), so it captures the beam-shaping-relevant curvature rather than an absolute
-wavefront.
+As noted in Section 5.4, the stored map is a **relative phase** referenced to the central
+patch; piston/tilt removal is applied to $\Phi_1$ and to diagnostic products but not to the
+delivered $\Phi_0$ feedback map.
 
 ---
 
