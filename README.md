@@ -658,7 +658,19 @@ pip install "tensorflow<2.11"          # Windows GPU
 # FLIR camera / HDR imaging — PySpin is NOT on PyPI:
 #   download the Spinnaker SDK + matching wheel from Teledyne FLIR, then:
 pip install spinnaker_python-<version>-cp3XX-*.whl
+
+# Bench calibration scripts (experiment_scans/, Stage0_Phi0 package) — extra imports
+# (imageio, Pillow, scikit-image, tqdm, h5py, pandas). The server does not need these:
+pip install ".[calibration]"           # or: pip install imageio Pillow scikit-image tqdm h5py pandas
 ```
+
+> **Running the production calibration code in this environment.** `dmd_server.py`
+> only needs `numpy`, `sipyco`, `ALP4lib`, and `pySLM2`. The Φ₀/Φ₁ acquisition and
+> analysis scripts (e.g. `experiment_scans/Stage0_Phi0_Package_v2_AUDITED_3908/`)
+> additionally import `imageio`, `Pillow`, `scikit-image`, `tqdm`, `h5py`, `pandas`
+> (all covered by the `calibration` extra) and `PySpin` for camera acquisition. `scipy`
+> and `matplotlib` are already present as pySLM2 dependencies, and `pySLM2.util.ALPController`
+> uses `ALP4lib`, so those match automatically.
 
 After installation you can launch either with the entry point or directly:
 

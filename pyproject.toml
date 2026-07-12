@@ -36,6 +36,18 @@ dependencies = [
 gpu = ["tensorflow<=2.10"]
 # Developer tooling.
 dev = ["build", "twine", "pytest"]
+# Bench calibration scripts (experiment_scans/, incl. the Stage0_Phi0 package).
+# The server itself does NOT import these; add them to run the acquisition +
+# analysis code in the same environment. Camera acquisition also needs PySpin
+# (Spinnaker SDK), which is not on PyPI — install it manually (see README).
+calibration = [
+    "imageio",
+    "Pillow",
+    "scikit-image",
+    "tqdm",
+    "h5py",
+    "pandas",
+]
 # NOTE: the FLIR camera dependency "PySpin" (Spinnaker SDK) is NOT on PyPI and
 # cannot be declared here. Install it manually from Teledyne FLIR — see README.
 
