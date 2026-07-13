@@ -76,7 +76,7 @@ def run_hardware(values, dwell):
     timings = {"upload_per_frame": []}  # collected per-frame upload+display-arm times
 
     t_init0 = time.perf_counter()
-    dmd = ALP4(version="4.3")
+    dmd = ALP4(version="4.3",libDir="C:\Program Files\ALP-4.3\ALP-4.3 API")
     dmd.Initialize()
     timings["init"] = time.perf_counter() - t_init0
     try:

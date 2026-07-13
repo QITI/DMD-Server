@@ -225,7 +225,7 @@ def run_hardware(default_max, preset_order):
     reprogram_times = []  # total time to change the order, per reprogram
 
     t_init0 = time.perf_counter()
-    dmd = ALP4(version="4.3")
+    dmd = ALP4(version="4.3",libDir="C:\Program Files\ALP-4.3\ALP-4.3 API")
     dmd.Initialize()
     t_init = time.perf_counter() - t_init0
     try:
