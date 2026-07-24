@@ -88,6 +88,15 @@ Reprogramming briefly `Halt()`s and re-`Run()`s the sequence (so triggering
 pauses for the ~ms it takes to rewrite the FLUT), but it never frees or re-uploads
 the frames.
 
+> **Trigger → display latency & jitter.** The number does not change the instant you
+> send the pulse. Per the ALP-4.3 API, the frame transition happens **between
+> `1×PictureTime` and `2×PictureTime` after the trigger edge** (`PictureTime` floor
+> ≈ 77 µs), because the trigger is asynchronous to the DMD's internal frame clock.
+> So expect the displayed number to update **~77–154 µs** after each pulse, with up
+> to ~77 µs of shot-to-shot jitter — normal, not a fault. In a real experiment the
+> kernel must wait this worst case (~180 µs) before gating the addressing laser; see
+> "Trigger Latency & Jitter" in [`../README.md`](../README.md).
+
 **Wiring:**
 
 ```

@@ -32,7 +32,7 @@ This server runs on a Windows PC with GPU and USB access to the Vialux ALP 4.3 c
 │        │                                                           │                │
 │        │   @kernel dmd_advance():                                  │                │
 │        │       self.DMD_TTL.pulse(1*us)  ──────────────────────┐   │                │
-│        │       delay(100*us)                                   │   │                │
+│        │       delay(180*us)  # 2xPictureTime + settle         │   │                │
 │        │                                                       │   │                │
 │        │   Optional: DMD_SYNCH input ◄────────────────────┐    │   │                │
 │        └──────────────────────────────────────────────────┼────┼───┘                │
@@ -407,17 +407,18 @@ Single exposure: ~10³ dynamic range. To verify IX = 10⁻⁶, combine multiple 
 │  │  │                                                            │   │     │
 │  │  │  ┌─────────┐  ┌─────────┐  ┌──────────┐  ┌────────────┐    │   │     │
 │  │  │  │ Cooling │  │  Prep   │  │   DMD    │  │ Detection  │    │   │     │
-│  │  │  │  ~1 ms  │→ │ ~100 μs │→ │  ~100 μs │→ │  ~20 μs    │    │   │     │
+│  │  │  │  ~1 ms  │→ │ ~100 μs │→ │ ~180 μs  │→ │  ~20 μs    │    │   │     │
 │  │  │  └─────────┘  └─────────┘  └────┬─────┘  └────────────┘    │   │     │
 │  │  │                                  │                         │   │     │
 │  │  │                    DMD_TTL.pulse(1*us)                     │   │     │
-│  │  │                    delay(100*us)                           │   │     │
+│  │  │                    delay(180*us)  # 2xPictureTime+settle   │   │     │
 │  │  │                         │                                  │   │     │
 │  │  │         ┌───────────────▼──────────────────────┐           │   │     │
 │  │  │         │  Vialux hardware (no PC involved):   │           │   │     │
 │  │  │         │  1. FPGA reads FLUT[counter]         │           │   │     │
-│  │  │         │  2. Fetches frame from DDR (~77 μs)  │           │   │     │
-│  │  │         │  3. Mirrors flip (~10-20 μs)         │           │   │     │
+│  │  │         │  2. Frame transition 1–2×PictureTime │           │   │     │
+│  │  │         │     (~77–154 μs after the edge)      │           │   │     │
+│  │  │         │  3. Mirrors settle (~10-20 μs)       │           │   │     │
 │  │  │         │  4. Counter += 1                     │           │   │     │
 │  │  │         │  5. Synch OUT pulse (optional)       │           │   │     │
 │  │  │         └──────────────────────────────────────┘           │   │     │
@@ -573,16 +574,15 @@ Time ─────────────────────────
 Kasli kernel:
  ┌──────────┐ ┌────────┐ ┌──┐          ┌────────────┐ ┌──────────────┐
  │  Cooling │ │  Pump  │ │  │ (delay)  │ AOM gate   │ │  Detection   │
- │  1 ms    │ │ 10 μs  │ │T │  100 μs  │  1–500 μs  │ │  ~20 μs      │
+ │  1 ms    │ │ 10 μs  │ │T │ ~180 μs  │  1–500 μs  │ │  ~20 μs      │
  └──────────┘ └────────┘ └──┘          └────────────┘ └──────────────┘
                           ↑ TTL pulse
                           │
-DMD hardware:            ┌──────────────────┐
-                         │ Frame transfer   │
-                         │ 77 μs            │
-                         │ + mirror settle  │
-                         │ 20 μs            │
-                         └──────────────────┘
+DMD hardware:            ┌────────────────────────────┐
+                         │ frame transition            │
+                         │ 1–2 × PictureTime (77–154μs)│
+                         │ + mirror settle ~20 μs      │
+                         └────────────────────────────┘
                                             ↑
                                      Beam stable here
                                      AOM gates ON
@@ -596,6 +596,48 @@ AOM (addressing laser):
  ◄────────── ~1.2 ms ──────────────►◄──── ~0.5 ms ────►◄── ~1 ms ──►
               state prep                  addressing         readout
 ```
+
+---
+
+## Trigger Latency & Jitter
+
+The DMD does **not** switch instantly on the trigger edge. Per the ALP-4.3 API, the
+frame transition happens **between `1×PictureTime + SynchDelay` and `2×PictureTime +
+SynchDelay` after the trigger edge**.
+
+**Why:** the DMD displays frames on an internal frame clock of period `PictureTime`
+(floor ≈ the 77 µs minimum picture time). Your TTL trigger is *asynchronous* to that
+clock and the swap only happens at an internal frame boundary, with a one-frame
+pipeline. So the delay is a **one-frame pipeline latency plus up to one full
+`PictureTime` of jitter**, depending on where the edge lands relative to the clock.
+`SynchDelay` is a small programmable offset (usually 0).
+
+```
+internal frame clock: |---PictureTime---|---PictureTime---|---PictureTime---|
+edge just BEFORE a boundary:  new frame up ≈ 1×PictureTime later   (best case)
+edge just AFTER  a boundary:  new frame up ≈ 2×PictureTime later   (worst case)
+                              ⇒ up to ~1×PictureTime shot-to-shot jitter
+```
+
+**At the minimum PictureTime (~77 µs):**
+
+| | after trigger edge |
+|---|---|
+| Best case | ~77 µs |
+| Worst case | ~154 µs |
+| + mirror settle | ~20 µs |
+| **Safe wait before AOM ON** | **≈ 2×PictureTime + settle ≈ 180 µs** (use ~200 µs for margin) |
+
+**Consequences**
+- Gate the addressing AOM only after `≈ 180–200 µs`, **not** 100 µs — 100 µs covers
+  only the best/typical case and can illuminate the ions during a mid-transition state
+  on late-phase triggers.
+- There is inherent **~77 µs shot-to-shot jitter** in when the beam appears. To remove
+  it, don't wait a fixed delay — wait for the **SYNCH OUT** pulse that marks the new
+  frame going live (wire Vialux SYNCH OUT → a Kasli TTL input; see the
+  `dmd_advance_verified()` stub and `configure_synch_output()`).
+- The FLUT works identically here (it just changes *which* frame the transition lands
+  on); the latency/jitter is the same.
 
 ---
 
@@ -790,20 +832,25 @@ device_db["dmd"] = {
 ```python
 @kernel
 def dmd_advance(self):
-    """Advance to next FLUT entry. ~100 μs total."""
+    """Advance to next FLUT entry, then wait until the frame is displayed.
+    Wait = worst-case 2*PictureTime + settle (see 'Trigger Latency & Jitter')."""
     self.DMD_TTL.pulse(1*us)
-    delay(100*us)
+    delay(180*us)   # 2 x PictureTime(~77us) + ~20us settle; NOT 100us
 
 @kernel
 def dmd_select_frame(self, target_frame, current_frame, n_frames):
-    """Jump to specific frame. Costs (steps × 77 μs) + 20 μs."""
+    """Jump to specific frame. Costs (steps × 77 μs) + final-frame settle."""
     steps = (target_frame - current_frame) % n_frames
     if steps > 0:
         for i in range(steps):
             self.DMD_TTL.pulse(1*us)
             delay(76*us)
-        delay(20*us)
+        delay(180*us)   # final frame transition is up to 2*PictureTime after last edge
 ```
+
+> **Note:** the older `delay(100*us)` only covered the best/typical case. See
+> [Trigger Latency & Jitter](#trigger-latency--jitter) — the frame can appear up to
+> `2*PictureTime` after the edge, so wait ~180–200 µs (or use SYNCH OUT feedback).
 
 ---
 

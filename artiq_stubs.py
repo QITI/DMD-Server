@@ -39,16 +39,28 @@ BEFORE these kernel functions execute.
 """
 @kernel
 def dmd_advance(self):
-    '''Advance DMD to the next frame in sequence/FLUT. 
-    
-    Fires a single TTL pulse and waits for mirror settling.
-    Total time: ~100 μs (1 μs pulse + 76 μs transfer + 20 μs settle + margin).
-    
-    The AOM must be OFF during this call (mirrors transitioning).
-    Gate the addressing AOM AFTER this returns.
+    '''Advance DMD to the next frame in sequence/FLUT.
+
+    Fires a single TTL pulse and waits until the new frame is guaranteed
+    displayed and settled.
+
+    Trigger->display latency (ALP-4.3 API): the frame transition occurs between
+    1*PictureTime + SynchDelay and 2*PictureTime + SynchDelay after the trigger
+    edge. The trigger is asynchronous to the DMD's internal frame clock, so
+    there is up to one PictureTime of shot-to-shot JITTER plus a one-frame
+    pipeline delay. At the minimum PictureTime (~77 us) that is ~77-154 us,
+    then ~20 us mirror settle.
+
+    We therefore wait the WORST case: 2*PictureTime + settle ~= 2*77 + 20
+    ~= 174 us, rounded up to 180 us (use ~200 us for extra margin). The old
+    100 us value only covered the best/typical case, not the 2x worst case.
+
+    The AOM must be OFF during this call (mirrors transitioning). Gate the
+    addressing AOM only AFTER this returns. To remove the jitter entirely, use
+    the SYNCH OUT feedback instead of a fixed wait (see dmd_advance_verified).
     '''
     self.DMD_TTL.pulse(1*us)
-    delay(100*us)
+    delay(180*us)   # 2 x PictureTime(~77us) + settle; covers worst-case trigger phase
 
 
 @kernel
@@ -72,7 +84,9 @@ def dmd_select_frame(self, target_frame, current_frame, n_frames):
         for i in range(steps):
             self.DMD_TTL.pulse(1*us)
             delay(76*us)  # minimum picture time (77 μs total with pulse)
-        delay(20*us)  # final mirror settle
+        # The final frame transition still occurs up to 2*PictureTime after the
+        # last edge, then the mirrors settle. Wait the worst case, not just 20 us.
+        delay(180*us)  # 2 x PictureTime(~77us) + settle on the final frame
 
 
 @kernel 
@@ -89,9 +103,26 @@ def dmd_advance_and_gate(self, addressing_time):
     addressing_time : float, duration to keep AOM on (detection or reset time)
     '''
     self.DMD_TTL.pulse(1*us)
-    delay(100*us)  # mirror settle
+    delay(180*us)  # worst-case 2 x PictureTime + settle before the beam is valid
     # Gate the addressing laser
     # self.addressing_AOM.pulse(addressing_time)  # uncomment when AOM is wired
+
+
+@kernel
+def dmd_advance_verified(self):
+    '''Advance one frame and wait for the SYNCH OUT pulse instead of a fixed delay.
+
+    This removes the trigger-phase jitter: rather than waiting the 2*PictureTime
+    worst case blindly, we wait for the hardware SYNCH OUT pulse that marks the
+    new frame going live (wire Vialux SYNCH OUT -> a Kasli TTL input, DMD_SYNCH).
+
+    Requires configure_synch_output() on the server side.
+    '''
+    self.DMD_TTL.pulse(1*us)
+    self.DMD_SYNCH.gate_rising(200*us)         # window covers the worst-case latency
+    if self.DMD_SYNCH.timestamp_mu(now_mu()) < 0:
+        self.dmd_error_count += 1              # synch missing -> flag the shot
+    delay(20*us)                               # mirror settle after the synch pulse
 """
 
 # ==========================================
